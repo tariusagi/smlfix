@@ -3,7 +3,7 @@ See the file COPYING for license details.
 Credits can be found in the Users Manual.
 
 Processing config: 
-Processing plugin dlls: "D:\PortDev\NSIS\Plugins\*.dll"
+Processing plugin dlls: "E:\msys\local\nsis\Plugins\*.dll"
  - AdvSplash::show
  - Banner::destroy
  - Banner::getWindow
@@ -67,14 +67,14 @@ Processing plugin dlls: "D:\PortDev\NSIS\Plugins\*.dll"
 
 !define: "MUI_INSERT_NSISCONF"=""
 
-Changing directory to: "D:\Documents\My Projects\smlfix"
+Changing directory to: "E:\msys\home\Golden-PC\prj\smlfix"
 
 Processing script file: "setup.nsi"
 !define: "productName"="Smartlaunch Fix"
 !define: "baseName"="smlfix"
-!define: "productVersion"="0.7"
+!define: "productVersion"="0.8.1"
 Name: "Smartlaunch Fix Service Setup"
-OutFile: "smlfix_0.7.exe"
+OutFile: "smlfix_0.8.1.exe"
 InstallDir: "$WINDIR\system32"
 Section: ""
 SetOutPath: "$INSTDIR"
@@ -87,8 +87,8 @@ Delete: "$INSTDIR\smlfix.dll"
 WriteRegStr: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit=$WINDIR\system32\userinit.exe,
 MessageBox: 0: "The old Smartlaunch Fix was UNINSTALLED!"
 MessageBox: 4: "Do you want to INSTALL Smartlaunch Fix now?" (on IDNO goto cancel)
-File: "smlfix.exe" [compress] 20790/21504 bytes
-File: "smlfix.dll" [compress] 18285/19456 bytes
+File: "smlfix.exe" [compress] 22182/44544 bytes
+File: "smlfix.dll" [compress] 19683/39936 bytes
 WriteRegStr: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit=$INSTDIR\smlfix.exe -efw -a reboot,
 MessageBox: 4: "Do you want to run Smartlaunch Fix now?" (on IDNO goto finish)
 ExecWait: "$INSTDIR\smlfix.exe -w -a reboot" (->)
@@ -104,14 +104,14 @@ Processing pages... Done!
 Removing unused resources... Done!
 Generating language tables... Done!
 
-Output: "D:\Documents\My Projects\smlfix\smlfix_0.7.exe"
+Output: "E:\msys\home\Golden-PC\prj\smlfix\smlfix_0.8.1.exe"
 Install: 2 pages (128 bytes), 1 section (1048 bytes), 21 instructions (588 bytes), 50 strings (1152 bytes), 1 language table (198 bytes).
 
 Using zlib compression.
 
 EXE header size:               32768 / 35328 bytes
-Install code:                   1022 / 3442 bytes
-Install data:                  39083 / 40968 bytes
-CRC (0x4401D106):                  4 / 4 bytes
+Install code:                   1020 / 3442 bytes
+Install data:                  41873 / 84488 bytes
+CRC (0xD3937F5E):                  4 / 4 bytes
 
-Total size:                    72877 / 79742 bytes (91.3%)
+Total size:                    75665 / 123262 bytes (61.3%)

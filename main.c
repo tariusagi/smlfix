@@ -476,14 +476,14 @@ void fix_sml_settings()
 	}
 
 	strcpy(sml_inf, sml_path);
-	strcat(sml_inf, "\\Client\\Data\\Inf\\Client.inf");
+	strcat(sml_inf, "\\Data\\Inf\\Client.inf");
 
 	strcpy(sml_inf2, sml_inf);
 	strcat(sml_inf2, ".fixed");
 
 	if ((f = fopen(sml_inf, "r")) == NULL)
 	{
-		printf("ERROR: the Smartlaunch configuration file doesn't exist.\n");
+		printf("ERROR: the Smartlaunch configuration file \"%s\" doesn't exist.\n", sml_inf);
 	}
 	else
 	{
