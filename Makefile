@@ -42,14 +42,14 @@ smlfix.exe: main.o util.o getopt.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS) 
 	echo Stripping $@...
 	strip $@
-	#upx -q $@
+	upx -q $@
 
 smlfix.dll: dll.o util.o
 	echo Generating $@...
 	$(CC) $(LDFLAGS) -mdll -o $@ $^ $(LIBS) 
 	echo Stripping $@...
 	strip $@
-	#upx -q $@
+	upx -q $@
 
 clean:
 	echo Removing output...
