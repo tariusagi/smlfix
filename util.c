@@ -95,6 +95,8 @@ void yell(char* format, ...)
 	printf("%s\n", buf);
 }
 
+// Output a formatted log text.
+// NOTE: the output log text is limitted at 500 characters.
 void do_log(char* format, ...)
 {
 	char					buf[501];
@@ -126,6 +128,60 @@ void do_log(char* format, ...)
 	fprintf(f, ": %s\n", buf);
 	// Close the log file and flush all unwritten data.
 	fclose(f);
+}
+
+// Output a formatted log text along with the latest system error string for the
+// given system error code (in errno).
+// NOTE: the output log text is limitted at 500 characters.
+void do_error_log(DWORD err_no, char* format, ...)
+{
+	char					buf[501];
+	time_t					t;
+	FILE*					f;
+	va_list					argList;
+	LPVOID					sys_msg_buf;
+
+	if (!log_flag)
+		return;
+
+	if (!strlen(log_path))
+		return;
+
+	// First, get the system error string.
+	if (!FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+				  FORMAT_MESSAGE_FROM_SYSTEM | 
+				  FORMAT_MESSAGE_IGNORE_INSERTS,
+				  NULL, 
+				  err_no, 
+				  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+				  (LPTSTR) &sys_msg_buf, 
+				  0, 
+				  NULL))
+	{
+		do_log("(UTIL) Couldn't format message for system error code %d.", errno);
+		return;
+	}
+
+	// Now create/open the log file and write log content.
+	f = fopen(log_path, "a+");
+
+	if (f == NULL)
+		return;
+
+	// Retrieve current timestamp.
+	t = time(NULL);
+	strftime(buf, 9, "%H:%M:%S", (const struct tm *)localtime(&t));
+	// Write the timestamp first.
+	fprintf(f, "%s", buf);
+	// Compose the input and log it.
+	va_start(argList, format);
+	vsnprintf(buf, 500, format, argList);
+	va_end(argList);
+	fprintf(f, ": %s. %s", buf, (char *) sys_msg_buf);
+	// Close the log file and flush all unwritten data.
+	fclose(f);
+	// Free the system message buffer.
+	LocalFree(sys_msg_buf);
 }
 
 void trim(char *s)
@@ -160,13 +216,13 @@ BOOL get_ip(char **ip)
 
 	if (WSAStartup(winsock_version, &winsock_data) != 0)
 	{
-		do_log("(UTIL) Failed to initialize Winsock 2 library.");
+		do_error_log(GetLastError(), "(UTIL) Failed to initialize Winsock 2 library");
 		return FALSE;
 	}
 
 	if (gethostname(host_name, sizeof(host_name) - 1) != 0)
 	{
-		do_log("(UTIL) Failed to query local hostname.");
+		do_error_log(GetLastError(), "(UTIL) Failed to query local hostname");
 		WSACleanup();
 		return FALSE;
 	}
@@ -174,7 +230,7 @@ BOOL get_ip(char **ip)
 	do_log("(UTIL) The current host name: \"%s\".", host_name);
 	if ((host_info = gethostbyname(host_name)) == NULL)
 	{
-		do_log("(UTIL) Failed to query host info.");
+		do_error_log(GetLastError(), "(UTIL) Failed to query host info");
 		WSACleanup();
 		return FALSE;
 	} 
@@ -196,7 +252,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 	// Open this process' token. 
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
 	{
-		do_log("(UTIL) Failed to open process token.");
+		do_error_log(GetLastError(), "(UTIL) Failed to open process token");
 		return -1;
 	}
 	// Get the LUID for the inject DLL (DEBUG) privilege. 
@@ -209,7 +265,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 	// Cannot test the return value of AdjustTokenPrivileges. 
 	if (GetLastError() != ERROR_SUCCESS) 
 	{
-		do_log("(UTIL) Failed to adjust debug privilege.");
+		do_error_log(GetLastError(), "(UTIL) Failed to adjust debug privilege");
 		return -1;
 	}
 
@@ -217,7 +273,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 
 	if(!proccess_handle)
 	{
-		do_log("(UTIL) Couldn't open host process.");
+		do_error_log(GetLastError(), "(UTIL) Couldn't open host process");
 		return -1;
 	}
 
@@ -227,7 +283,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 
 	if (load_lib_address == NULL)
 	{
-		do_log("(UTIL) Couldn't get LoadLibraryA address.");
+		do_error_log(GetLastError(), "(UTIL) Couldn't get LoadLibraryA address");
 		return -1;
 	}
 
@@ -256,7 +312,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 
 	if (thread_handle == NULL)
 	{
-		do_log("(UTIL) Couldn't create remote thread. Error code %d.", GetLastError());
+		do_error_log(GetLastError(), "(UTIL) Couldn't create remote thread");
 		return -1;
 	}
 	else
@@ -285,7 +341,7 @@ void force_reboot()
 	// Get a token for this process. 
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
 	{
-		do_log("(UTIL) Failed to open process token.");
+		do_error_log(GetLastError(), "(UTIL) Failed to open process token");
 		return;
 	}
 	// Get the LUID for the shutdown privilege. 
@@ -297,7 +353,7 @@ void force_reboot()
 	// Cannot test the return value of AdjustTokenPrivileges. 
 	if (GetLastError() != ERROR_SUCCESS) 
 	{
-		do_log("(UTIL) Failed to adjust shutdown privilege.");
+		do_error_log(GetLastError(), "(UTIL) Failed to adjust shutdown privilege");
 		return;
 	}
 	// Shut down the system and force all applications to close. 
@@ -338,7 +394,7 @@ DWORD get_pid_from_path(LPCSTR path)
 	if (!Process32First(snapshot_handle, &process_entries))
 	{
 		CloseHandle(snapshot_handle);
-		do_log("(UTIL) Unable to query processes list.");
+		do_error_log(GetLastError(), "(UTIL) Unable to query processes list");
 		return 0;
 	}
 
@@ -401,6 +457,12 @@ DWORD get_pid_from_path(LPCSTR path)
 					}
 
 					CloseHandle(process_handle);
+				}
+				else
+				{
+					CloseHandle(snapshot_handle);
+					do_error_log(GetLastError(), "(UTIL) Couldn't open handle to process ID %d", process_entries.th32ProcessID);
+					return 0;
 				}
 			}
 			else
@@ -465,7 +527,7 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
 
     if (mod_snap == INVALID_HANDLE_VALUE) 
 	{
-		do_log("(UTIL) Couldn't get module snapshot of PID %u", pid);
+		do_error_log(GetLastError(), "(UTIL) Couldn't get module snapshot of PID %u", pid);
         return FALSE; 
 	}
 
@@ -493,63 +555,3 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
 
     return (found); 
 } 
-
-// -----------------------------------------------------------------------------
-// get_pid_from_path find the process ID (PID) using the given path.
-//
-// Note that if the given path is not a full path (which has the colon character
-// to denote the drive letter) then this routine will use only the file name
-// portion. In either case, the first match will be returned.
-// -----------------------------------------------------------------------------
-/*DWORD get_pid_from_path(LPCSTR exe_path)
-{
-	DWORD pid = 0;
-	char exe_name[MAX_MODULE_NAME32 + 1];
-	BOOL is_full_path = strchr(exe_path, ':') != NULL;
-	HANDLE proc_snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	PROCESSENTRY32 proc_snap_entry = {0};
-
-	do_log("(UTIL) Getting PID from %s%s", is_full_path ? "(full path) " : "", exe_path);
-
-	proc_snap_entry.dwSize = sizeof(proc_snap_entry);
-
-	if (!Process32First(proc_snap, &proc_snap_entry))
-	{
-		CloseHandle(proc_snap);
-		return 0;
-	}
-
-	if (strchr(exe_path, '\\') == NULL)
-		strcpy(exe_name, exe_path);
-	else
-		strcpy(exe_name, (const char *)(strrchr(exe_path, '\\') + 1));
-
-	do_log("(UTIL) Looking up all processes named %s", exe_name);
-
-	do
-	{
-		if (_stricmp(exe_name, proc_snap_entry.szExeFile) == 0)
-		{
-			do_log("(UTIL) Found PID %u from %s", proc_snap_entry.th32ProcessID, proc_snap_entry.szExeFile);
-
-			if (is_full_path)
-			{
-				if (has_module(proc_snap_entry.th32ProcessID, exe_path)) 
-				{
-					pid = proc_snap_entry.th32ProcessID;
-					break;
-				}
-			}
-			else
-			{
-				pid = proc_snap_entry.th32ProcessID;
-				break;
-			}
-		}
-	}
-	while (Process32Next(proc_snap, &proc_snap_entry));
-
-	CloseHandle(proc_snap);
-
-	return pid;
-}*/

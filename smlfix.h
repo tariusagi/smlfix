@@ -35,6 +35,7 @@ extern char log_path[_MAX_PATH];
 void trim(char *s);
 void yell(char* format, ...);
 void do_log(char* format, ...);
+void do_error_log(DWORD err_no, char* format, ...);
 void force_reboot();
 BOOL get_ip(char **ip);
 DWORD get_pid_from_path(LPCSTR szPath);
