@@ -90,6 +90,7 @@ void terminate_watchdog()
 
 DWORD WINAPI watchdog_func(LPVOID data)
 {
+	DWORD session_id;
 	DWORD sml_pid = 0;
 	HANDLE sml_handle = NULL;
 	BOOL sml_launched = FALSE;
@@ -103,7 +104,8 @@ DWORD WINAPI watchdog_func(LPVOID data)
 	strcat(sml_exe, "\\Client.exe");
 
 	// Install 2nd watchdogs.
-	install_watchdog2(get_pid_from_path(SECONDARY_HOST));
+	ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
+	install_watchdog2(get_pid_from_path(SECONDARY_HOST, session_id));
 
 	do_log("(WATCHDOG) Watchdog is running (TID %ld)...", GetCurrentThreadId());
 
@@ -117,7 +119,7 @@ DWORD WINAPI watchdog_func(LPVOID data)
 		{
 			if (sml_missing)
 			{
-				if ((sml_pid = get_pid_from_path(sml_exe)) == 0)
+				if ((sml_pid = get_pid_from_path(sml_exe, -1)) == 0)
 				{
 					sml_countdown--;
 					do_log("(WATCHDOG) Counting down at %d...", sml_countdown);
@@ -175,7 +177,7 @@ DWORD WINAPI watchdog_func(LPVOID data)
 		}
 		else
 		{
-			if ((sml_pid = get_pid_from_path(sml_exe)) != 0)
+			if ((sml_pid = get_pid_from_path(sml_exe, -1)) != 0)
 			{
 				do_log("(WATCHDOG) Smartlaunch was launched, PID %u", sml_pid);
 				sml_launched = TRUE;
@@ -199,11 +201,19 @@ DWORD WINAPI watchdog_func(LPVOID data)
 				wait_result = WaitForSingleObject(watchdog2_handle, 0);
 
 				if (wait_result == WAIT_TIMEOUT) 
+				{
 					// The secondary watchdog is alive.
 					ResumeThread(watchdog2_handle);
+				}
 				else
+				{
+					DWORD session_id;
+					ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
+
 					// The secondary watchdog was killed. Re-install it.
-					install_watchdog2(get_pid_from_path(SECONDARY_HOST));
+					install_watchdog2(get_pid_from_path(SECONDARY_HOST, session_id));
+					do_log("(WATCHDOG) Second watchdog was re-installed.");
+				}
 			}
 
 			// Checking for unload flag.
@@ -645,6 +655,13 @@ BOOL install_watchdog2(DWORD pid)
 			, &watchdog2_func
 			, code_size
 			, &written_bytes);
+
+	if (!set_debug_priv())
+	{
+		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't set debug privilege");
+		CloseHandle(process_handle);
+		return FALSE;
+	}
 
 	// Start execution of remote watchdog2_func
 	watchdog2_handle = CreateRemoteThread(

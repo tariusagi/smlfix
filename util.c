@@ -333,6 +333,33 @@ DWORD inject_dll(DWORD pid, const char *name)
 	return ret_val;
 } 
 
+// Set DEBUG privilege to the calling process.
+// Return TRUE on success, FALSE on failure.
+BOOL set_debug_priv()
+{
+	HANDLE token_handle;
+	TOKEN_PRIVILEGES token_privilege; 
+
+	// Open the calling process' token. 
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
+	{
+		do_error_log(GetLastError(), "(UTIL) Failed to open process token");
+		return FALSE;
+	}
+	// Get the LUID for the inject DLL (DEBUG) privilege. 
+	LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &token_privilege.Privileges[0].Luid); 
+	token_privilege.PrivilegeCount = 1;  // one privilege to set    
+	token_privilege.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED; 
+
+	// Set the privilege.
+	if (!AdjustTokenPrivileges(token_handle, FALSE, &token_privilege, 0, (PTOKEN_PRIVILEGES)NULL, 0)) 
+	{
+		do_error_log(GetLastError(), "(UTIL) Failed to adjust debug privilege");
+		return FALSE;
+	}
+	else return TRUE;
+}
+
 void force_reboot()
 {
 	// Adjust privelege token so this process can shutdown Windows.
@@ -363,13 +390,15 @@ void force_reboot()
 }
 
 // -----------------------------------------------------------------------------
-// get_pid_from_path find the process ID (PID) using the given path.
+// get_pid_from_path find the process ID (PID) using the given path and
+// optional session ID. If the session_id is positive, then only process that
+// match the given session ID is returned.
 //
 // Note that if the given path is not a full path (which has the colon character
 // to denote the drive letter) then this routine will use only the file name
 // portion. In either case, the first match will be returned.
 // -----------------------------------------------------------------------------
-DWORD get_pid_from_path(LPCSTR path)
+DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 {
 	DWORD pid = 0;
 	HANDLE snapshot_handle = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -402,23 +431,24 @@ DWORD get_pid_from_path(LPCSTR path)
 	{
 		if (_stricmp(file_name, process_entries.szExeFile) == 0)
 		{
-			if (is_full_path)
+			HANDLE process_handle;
+
+			process_handle = OpenProcess
+				( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
+				, FALSE
+				, process_entries.th32ProcessID);
+
+			if (process_handle != NULL)
 			{
-				HMODULE temp[1];
-				HMODULE *module_handles;
-				HANDLE process_handle;
-				DWORD module_enum_size;
-				char s[MAX_PATH];
-				char *module_path;
-				int i;
-
-				process_handle = OpenProcess
-					( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
-					, FALSE
-					, process_entries.th32ProcessID);
-
-				if (process_handle != NULL)
+				if (is_full_path)
 				{
+					HMODULE temp[1];
+					HMODULE *module_handles;
+					DWORD module_enum_size;
+					char s[MAX_PATH];
+					char *module_path;
+					int i;
+
 					if (EnumProcessModules
 							( process_handle
 							, temp 
@@ -448,25 +478,49 @@ DWORD get_pid_from_path(LPCSTR path)
 									_stricmp(short_path, module_path) == 0)
 								{
 									pid = process_entries.th32ProcessID;
-									do_log("(UTIL) Found PID %d.", pid);
 								}
 							}
 
 							i++;
 						}
 					}
-
-					CloseHandle(process_handle);
 				}
-				else
-				{
-					CloseHandle(snapshot_handle);
-					do_error_log(GetLastError(), "(UTIL) Couldn't open handle to process ID %d", process_entries.th32ProcessID);
-					return 0;
-				}
+				else pid = process_entries.th32ProcessID;
 			}
 			else
-				pid = process_entries.th32ProcessID;
+			{
+				CloseHandle(snapshot_handle);
+				do_error_log(GetLastError(), "(UTIL) Couldn't open handle to process ID %d", process_entries.th32ProcessID);
+				return 0;
+			}
+
+			if (pid) do_log("(UTIL) Found PID %d.", pid);
+
+			if (pid && (session_id != -1))
+			{
+				// A process that match the given path has been found?
+				// We need to check its session.
+				DWORD session_id2;
+
+				do_log("(UTIL) Checking session from PID %d against SID %d...", pid, session_id);
+
+				if (!ProcessIdToSessionId(pid, &session_id2))
+				{
+					do_error_log(GetLastError(), "(UTIL) Couldn't get session ID from PID %d", process_entries.th32ProcessID);
+					CloseHandle(process_handle);
+					return 0;
+				}
+
+				if (session_id != session_id2)
+				{
+					pid = 0;
+					do_log("(UTIL) PID %d is in session %d, doesn't match SID %d.", pid, session_id2, session_id);
+				}
+				else
+					do_log("(UTIL) PID %d is in session %d, match SID %d.", pid, session_id2, session_id);
+			}
+
+			CloseHandle(process_handle);
 		}
 	}
 	while (pid == 0 && Process32Next(snapshot_handle, &process_entries));

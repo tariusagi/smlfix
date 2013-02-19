@@ -78,6 +78,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// Set DEBUG privilege for this process so it can do special stuffs.
+	if (!set_debug_priv())
+	{
+		printf("Couldn't set debug privilege. Terminating...\n");
+		return 1;
+	}
+
 	if (unload_watchdog_flag)
 	{
 		if (unload_watchdogs())
@@ -258,7 +265,7 @@ BOOL install_watchdog()
 	printf("Installing watchdog(s)...\n");
 
 	// Find the host process.
-	pid = get_pid_from_path(host_path);
+	pid = get_pid_from_path(host_path, -1);
 	
 	if (!pid)
 	{
