@@ -37,14 +37,14 @@ all: smlfix.exe smlfix.dll setup.nsi
 	makensis /Onsis.log setup.nsi
 	echo Done!
 
-smlfix.exe: main.o util.o getopt.o
+smlfix.exe: main.o util.o getopt.o resource.o
 	echo Generating $@...
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS) 
 	echo Stripping $@...
 	strip $@
 	upx -q $@
 
-smlfix.dll: dll.o util.o
+smlfix.dll: dll.o util.o resource.o
 	echo Generating $@...
 	$(CC) $(LDFLAGS) -mdll -o $@ $^ $(LIBS) 
 	echo Stripping $@...
