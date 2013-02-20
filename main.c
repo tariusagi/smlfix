@@ -435,11 +435,12 @@ void exec_userinit()
 {
 	char userinit_path[_MAX_PATH];
 
-	printf("Launching userinit.exe...\b");
 	GetEnvironmentVariable("Windir", userinit_path, _MAX_PATH);
 	strcat(userinit_path, "\\system32\\userinit.exe");
-	_spawnl(_P_NOWAIT, userinit_path, NULL);
-	printf("userinit.exe was launched.\n");
+	if (_spawnl(_P_NOWAIT, userinit_path, userinit_path, NULL) == (intptr_t) NULL)
+		do_log("(MAIN) Couldn't execute %s. Error code %d\n", userinit_path, errno);
+	else
+		do_log("(MAIN) Executed %s.\n", userinit_path);
 }
 
 void fix_sml_settings()

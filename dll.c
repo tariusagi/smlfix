@@ -131,10 +131,8 @@ DWORD WINAPI watchdog_func(LPVOID data)
 						if (shared_mem_ptr->watchdog_action == ACTION_REBOOT)
 						{
 							do_log("(WATCHDOG) Force reboot now.");
-							//force_reboot();
-							// Kill myself so the secondary watchdog will cause a BSOD
-							// and force Windows to reboot.
-							return 1;
+							force_reboot();
+							unload = TRUE;
 						}
 						else
 							// Ignore and unload;
