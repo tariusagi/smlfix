@@ -128,15 +128,30 @@ DWORD WINAPI watchdog_func(LPVOID data)
 					{
 						do_log("(WATCHDOG) Countdown reached zero.");
 
-						if (shared_mem_ptr->watchdog_action == ACTION_REBOOT)
+						switch (shared_mem_ptr->watchdog_action)
 						{
-							do_log("(WATCHDOG) Force reboot now.");
-							force_reboot();
-							unload = TRUE;
+							case ACTION_LOGOFF:
+								do_log("(WATCHDOG) Force logging off now.");
+								force_reboot(ACTION_LOGOFF);
+								unload = TRUE;
+								break;
+
+							case ACTION_REBOOT:
+								do_log("(WATCHDOG) Force reboot now.");
+								force_reboot(ACTION_REBOOT);
+								unload = TRUE;
+								break;
+
+							case ACTION_SHUTDOWN:
+								do_log("(WATCHDOG) Force shutdown now.");
+								force_reboot(ACTION_SHUTDOWN);
+								unload = TRUE;
+								break;
+
+							default:
+								// Ignore and unload;
+								unload = TRUE;
 						}
-						else
-							// Ignore and unload;
-							unload = TRUE;
 					}
 				}
 				else

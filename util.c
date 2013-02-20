@@ -5,6 +5,7 @@
 #include <tlhelp32.h>
 #include <winsock2.h>
 #include <psapi.h>
+#include "smlfix.h"
 
 // Some definitions from Windows NT DDK and other sources.
 #define NT_SUCCESS(status) ((NTSTATUS)(status) >= 0)
@@ -360,11 +361,12 @@ BOOL set_debug_priv()
 	else return TRUE;
 }
 
-void force_reboot()
+void force_reboot(int action)
 {
 	// Adjust privelege token so this process can shutdown Windows.
 	HANDLE token_handle; 
 	TOKEN_PRIVILEGES token_privilege; 
+	UINT flags = 0;
 	// Get a token for this process. 
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
 	{
@@ -383,9 +385,35 @@ void force_reboot()
 		do_error_log(GetLastError(), "(UTIL) Failed to adjust shutdown privilege");
 		return;
 	}
-	// Shut down the system and force all applications to close. 
-	ExitWindowsEx(EWX_REBOOT | EWX_FORCE, 0);
-	//ExitWindowsEx(EWX_REBOOT, 0);
+	// Set the flags.
+	switch (action)
+	{
+		case ACTION_LOGOFF:
+			flags = EWX_LOGOFF | EWX_FORCE | EWX_FORCEIFHUNG;
+			break;
+		case ACTION_REBOOT:
+			flags = EWX_REBOOT | EWX_FORCE | EWX_FORCEIFHUNG;
+			break;
+		case ACTION_SHUTDOWN:
+			flags = EWX_POWEROFF | EWX_FORCE | EWX_FORCEIFHUNG;
+			break;
+	}
+	// Reboot the system and force all applications to close. 
+	if (!ExitWindowsEx(flags, 0))
+		do_error_log(GetLastError(), "(UTIL) Failed to force a reboot");
+	else switch (action)
+	{
+		case ACTION_LOGOFF:
+			do_log("(UTIL) Forced a log off.");
+			break;
+		case ACTION_REBOOT:
+			do_log("(UTIL) Forced a reboot.");
+			break;
+		case ACTION_SHUTDOWN:
+			do_log("(UTIL) Forced a shutdown.");
+			break;
+	}
+
 	return;
 }
 

@@ -22,9 +22,9 @@ section
 	MessageBox MB_YESNO "Do you want to INSTALL ${productName} now?" IDNO cancel 
 	File ${baseName}.exe
 	File ${baseName}.dll
-	WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "Userinit" "$INSTDIR\${baseName}.exe -efw -a reboot,"
+	WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "Userinit" "$INSTDIR\${baseName}.exe -efw -a logoff,"
 	MessageBox MB_YESNO "Do you want to run ${productName} now?" IDNO finish
-	ExecWait "$INSTDIR\${baseName}.exe -w -a reboot"
+	ExecWait "$INSTDIR\${baseName}.exe -w -a logoff"
 	MessageBox MB_OK "Smartlaunch client is now protected!"
 	goto finish
 
