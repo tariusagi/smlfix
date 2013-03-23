@@ -20,6 +20,7 @@ char usage_text[] =
 	"                 one of these:\n"
 	"                     shutdown      Forcefully shutdown the computer\n"
 	"                     reboot        Forcefully reboot the computer\n"
+	"                     hardreboot    Instantly reboot the computer\n"
 	"                     logoff        Forcefully log off the current user\n"
 	"                     ignore        Do nothing and terminate all watchdogs. This\n"
 	"                                   is default.\n"
@@ -141,6 +142,8 @@ BOOL parse_cmdline(int argc, char **argv)
 					watchdog_action_flag = ACTION_IGNORE;
 				else if (strcmp(optarg, "logoff") == 0)
 					watchdog_action_flag = ACTION_LOGOFF;
+				else if (strcmp(optarg, "hardreboot") == 0)
+					watchdog_action_flag = ACTION_HARD_REBOOT;
 				else if (strcmp(optarg, "reboot") == 0)
 					watchdog_action_flag = ACTION_REBOOT;
 				else if (strcmp(optarg, "shutdown") == 0)
@@ -236,6 +239,9 @@ void print_settings()
 				break;
 			case ACTION_REBOOT:
 				printf("%-30s%s\n", "Watchdog action", "reboot");
+				break;
+			case ACTION_HARD_REBOOT:
+				printf("%-30s%s\n", "Watchdog action", "hardreboot");
 				break;
 			case ACTION_SHUTDOWN:
 				printf("%-30s%s\n", "Watchdog action", "shutdown");

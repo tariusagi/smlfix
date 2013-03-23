@@ -142,6 +142,15 @@ DWORD WINAPI watchdog_func(LPVOID data)
 								unload = TRUE;
 								break;
 
+							case ACTION_HARD_REBOOT:
+								do_log("(WATCHDOG) Force a HARD reboot now.");
+								//force_reboot(ACTION_REBOOT);
+								// Exit calling process (supposedly winlogon)
+								// to cause a system crash and reboot.
+								ExitProcess(0);
+								unload = TRUE;
+								break;
+
 							case ACTION_SHUTDOWN:
 								do_log("(WATCHDOG) Force shutdown now.");
 								force_reboot(ACTION_SHUTDOWN);
