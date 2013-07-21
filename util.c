@@ -5,6 +5,7 @@
 #include <tlhelp32.h>
 #include <winsock2.h>
 #include <psapi.h>
+#include <process.h>
 #include "smlfix.h"
 
 // Some definitions from Windows NT DDK and other sources.
@@ -385,33 +386,43 @@ void force_reboot(int action)
 		do_error_log(GetLastError(), "(UTIL) Failed to adjust shutdown privilege");
 		return;
 	}
-	// Set the flags.
-	switch (action)
+	// Gonna reboot using system's shutdown command?
+	if (action == ACTION_REBOOT2)
 	{
-		case ACTION_LOGOFF:
-			flags = EWX_LOGOFF | EWX_FORCE | EWX_FORCEIFHUNG;
-			break;
-		case ACTION_REBOOT:
-			flags = EWX_REBOOT | EWX_FORCE | EWX_FORCEIFHUNG;
-			break;
-		case ACTION_SHUTDOWN:
-			flags = EWX_POWEROFF | EWX_FORCE | EWX_FORCEIFHUNG;
-			break;
+		reboot_using_shutdown_cmd();
+		do_log("(UTIL) Forced a reboot using shutdown.exe.");
 	}
-	// Reboot the system and force all applications to close. 
-	if (!ExitWindowsEx(flags, 0))
-		do_error_log(GetLastError(), "(UTIL) Failed to force a reboot");
-	else switch (action)
+	else
 	{
-		case ACTION_LOGOFF:
-			do_log("(UTIL) Forced a log off.");
-			break;
-		case ACTION_REBOOT:
-			do_log("(UTIL) Forced a reboot.");
-			break;
-		case ACTION_SHUTDOWN:
-			do_log("(UTIL) Forced a shutdown.");
-			break;
+		// No. Will shutdown using ExitWindowsEx API.
+		// Set the flags.
+		switch (action)
+		{
+			case ACTION_LOGOFF:
+				flags = EWX_LOGOFF | EWX_FORCE | EWX_FORCEIFHUNG;
+				break;
+			case ACTION_REBOOT:
+				flags = EWX_REBOOT | EWX_FORCE | EWX_FORCEIFHUNG;
+				break;
+			case ACTION_SHUTDOWN:
+				flags = EWX_POWEROFF | EWX_FORCE | EWX_FORCEIFHUNG;
+				break;
+		}
+		// Reboot the system and force all applications to close. 
+		if (!ExitWindowsEx(flags, 0))
+			do_error_log(GetLastError(), "(UTIL) Failed to force a reboot");
+		else switch (action)
+		{
+			case ACTION_LOGOFF:
+				do_log("(UTIL) Forced a log off.");
+				break;
+			case ACTION_REBOOT:
+				do_log("(UTIL) Forced a reboot.");
+				break;
+			case ACTION_SHUTDOWN:
+				do_log("(UTIL) Forced a shutdown.");
+				break;
+		}
 	}
 
 	return;
@@ -637,3 +648,18 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
 
     return (found); 
 } 
+
+// Reboot Windows using system's shutdown command:
+// shutdown.exe /r /t 0
+void reboot_using_shutdown_cmd()
+{
+	char shutdown_cmd_path[_MAX_PATH];
+
+	GetEnvironmentVariable("Windir", shutdown_cmd_path, _MAX_PATH);
+	strcat(shutdown_cmd_path, "\\system32\\shutdown.exe");
+	if (_spawnl(_P_NOWAIT, shutdown_cmd_path, shutdown_cmd_path, "/r", "/t", "0", NULL) == (intptr_t) NULL)
+		do_log("(MAIN) Couldn't execute %s. Error code %d\n", shutdown_cmd_path, errno);
+	else
+		do_log("(MAIN) Executed %s.\n", shutdown_cmd_path);
+}
+

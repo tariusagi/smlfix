@@ -10,7 +10,7 @@ typedef enum {
 	ACTION_IGNORE,
 	ACTION_LOGOFF,
 	ACTION_REBOOT,
-	ACTION_HARD_REBOOT,
+	ACTION_REBOOT2,
 	ACTION_SHUTDOWN
 } action_t;
 
@@ -38,6 +38,7 @@ void yell(char* format, ...);
 void do_log(char* format, ...);
 void do_error_log(DWORD err_no, char* format, ...);
 void force_reboot(int action);
+void reboot_using_shutdown_cmd();
 BOOL set_debug_priv();
 BOOL get_ip(char **ip);
 DWORD get_pid_from_path(LPCSTR szPath, DWORD session_id);

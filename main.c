@@ -18,10 +18,10 @@ char usage_text[] =
 	"where:\n"
 	"    -a           Action to take when Smartlaunch process was attacked, must be\n"
 	"                 one of these:\n"
-	"                     shutdown      Forcefully shutdown the computer\n"
-	"                     reboot        Forcefully reboot the computer\n"
-	"                     hardreboot    Instantly reboot the computer\n"
-	"                     logoff        Forcefully log off the current user\n"
+	"                     shutdown      Shutdown the computer\n"
+	"                     reboot        Reboot the computer\n"
+	"                     reboot2       Reboot the computer using system shutdown command\n"
+	"                     logoff        Log off the current user\n"
 	"                     ignore        Do nothing and terminate all watchdogs. This\n"
 	"                                   is default.\n"
 	"    -c n         Time (in seconds) before taking action after the Smartlaunch\n"
@@ -142,10 +142,10 @@ BOOL parse_cmdline(int argc, char **argv)
 					watchdog_action_flag = ACTION_IGNORE;
 				else if (strcmp(optarg, "logoff") == 0)
 					watchdog_action_flag = ACTION_LOGOFF;
-				else if (strcmp(optarg, "hardreboot") == 0)
-					watchdog_action_flag = ACTION_HARD_REBOOT;
 				else if (strcmp(optarg, "reboot") == 0)
 					watchdog_action_flag = ACTION_REBOOT;
+				else if (strcmp(optarg, "reboot2") == 0)
+					watchdog_action_flag = ACTION_REBOOT2;
 				else if (strcmp(optarg, "shutdown") == 0)
 					watchdog_action_flag = ACTION_SHUTDOWN;
 				else
@@ -240,8 +240,8 @@ void print_settings()
 			case ACTION_REBOOT:
 				printf("%-30s%s\n", "Watchdog action", "reboot");
 				break;
-			case ACTION_HARD_REBOOT:
-				printf("%-30s%s\n", "Watchdog action", "hardreboot");
+			case ACTION_REBOOT2:
+				printf("%-30s%s\n", "Watchdog action", "reboot2");
 				break;
 			case ACTION_SHUTDOWN:
 				printf("%-30s%s\n", "Watchdog action", "shutdown");

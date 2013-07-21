@@ -1,5 +1,5 @@
 1 VERSIONINFO
-FILEVERSION     0,8,2,1
+FILEVERSION     0,8,3,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
@@ -11,7 +11,7 @@ BEGIN
       VALUE "LegalCopyright", "Phuong Vu, vuluuphuong@gmail.com"
       // VALUE "OriginalFilename", "smlfix.exe"
       VALUE "ProductName", "SMLFIX"
-      VALUE "ProductVersion", "0.8.2.1"
+      VALUE "ProductVersion", "0.8.3.0"
     END
   END
 
