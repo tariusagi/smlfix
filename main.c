@@ -497,11 +497,17 @@ void fix_sml_settings()
 
 	if ((f = fopen(sml_inf, "r")) == NULL)
 	{
-		printf("ERROR: the Smartlaunch configuration file \"%s\" doesn't exist.\n", sml_inf);
+		yell("ERROR: the Smartlaunch configuration file \"%s\" doesn't exist.\n", sml_inf);
 	}
 	else
 	{
-		f2 = fopen(sml_inf2, "w");
+		if ((f2 = fopen(sml_inf2, "w")) == NULL)
+		{
+			fclose(f);
+			yell("ERROR: couldn't create temporary configuration file \"%s\".\n", sml_inf2);
+			yell("The Smartlaunch configuration file was NOT fixed.\n");
+			return;
+		}
 
 		while (fgets(line, sizeof(line), f) != NULL)
 		{
@@ -526,7 +532,7 @@ void fix_sml_settings()
 		fclose(f2);
 		remove(sml_inf);
 		rename(sml_inf2, sml_inf);
-		printf("The Smartlaunch configuration file was fixed.\n");
+		yell("The Smartlaunch configuration file was fixed.\n");
 	}
 }
 
