@@ -2,8 +2,6 @@
 .SILENT:
 
 # Define macros.
-MAKE=mingw32-make
-CC=mingw32-gcc
 CFLAGS=-Wall -D_WIN32_WINNT=0x500 $(EXTRA_CFLAGS)
 LDFLAGS= 
 LIBS=-L lib -lws2_32 -lpsapi
@@ -34,7 +32,7 @@ release:
 
 all: smlfix.exe smlfix.dll setup.nsi
 	echo Creating an installer...
-	makensis /Onsis.log setup.nsi
+	makensis -Onsis.log setup.nsi
 	echo Done!
 
 smlfix.exe: main.o util.o getopt.o resource.o
