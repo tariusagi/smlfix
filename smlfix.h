@@ -34,13 +34,13 @@ extern BOOL log_flag;
 extern char log_path[_MAX_PATH];
 
 void trim(char *s);
-void yell(char* format, ...);
-void do_log(char* format, ...);
-void do_error_log(DWORD err_no, char* format, ...);
+void log_text(char* format, ...);
+void log_error(DWORD err_no, char* format, ...);
 void force_reboot(int action);
 void reboot_using_shutdown_cmd();
 BOOL set_debug_priv();
 BOOL get_ip(char **ip);
+BOOL get_ipv4_bytes(unsigned char *b1, unsigned char *b2, unsigned char *b3, unsigned char *b4);
 DWORD get_pid_from_path(LPCSTR szPath, DWORD session_id);
 DWORD GetPidFromPath(LPCSTR szPath);
 DWORD inject_dll(DWORD pid, const char *name);

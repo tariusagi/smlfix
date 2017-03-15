@@ -3,10 +3,12 @@
 !define productVersion "0.9.0.0"
 
 Name "Smartlaunch Fix Service Setup"
-OutFile "${baseName}_${productVersion}_x64.exe"
+OutFile "${baseName}_${productVersion}.exe"
 InstallDir "$WINDIR"
 
 section
+	# Ask user to confirm installation requirements.
+	MessageBox MB_YESNO "This installation requires: 1) Windows 64 bit; 2) UAC turned OFF. Are you sure to continue?" IDNO cancel 
 	# Make sure we're working with 64 version of Windows' registry.
 	SetRegView 64
 	SetOutPath $INSTDIR
@@ -24,7 +26,7 @@ section
 	MessageBox MB_YESNO "Do you want to INSTALL ${productName} to $INSTDIR now?" IDNO cancel 
 	File ${baseName}.exe
 	File ${baseName}.dll
-	WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "Userinit" "$INSTDIR\${baseName}.exe -efw -a reboot2,"
+	WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "Userinit" "$INSTDIR\${baseName}.exe -efwL -a reboot2,"
 	MessageBox MB_YESNO "Do you want to run ${productName} now?" IDNO finish
 	ExecWait "$INSTDIR\${baseName}.exe -w -a reboot2"
 	MessageBox MB_OK "Smartlaunch client is now protected!"

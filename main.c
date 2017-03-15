@@ -82,7 +82,7 @@ int main(int argc, char **argv)
 	// Set DEBUG privilege for this process so it can do special stuffs.
 	if (!set_debug_priv())
 	{
-		printf("Couldn't set debug privilege. Terminating...\n");
+		fprintf(stderr, "Couldn't set debug privilege. Terminating...\n");
 		return 1;
 	}
 
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 		if (unload_watchdogs())
 			printf("Watchdog was successfully unloaded.\n");
 		else
-			printf("Couldn't unload watchdog. It may not be running.\n");
+			fprintf(stderr, "Couldn't unload watchdog. It may not be running.\n");
 
 		return 0;
 	}
@@ -268,19 +268,19 @@ BOOL install_watchdog()
 	shared_mem_t *shared_mem_ptr;
 	DWORD err;
 
-	printf("Installing watchdog(s)...\n");
+	log_text("Installing watchdog(s)...");
 
 	// Find the host process.
 	pid = get_pid_from_path(host_path, -1);
 	
 	if (!pid)
 	{
-		yell("ERROR: there's no process executed from %s", host_path);
+		log_error(0, "There's no process executed from %s", host_path);
 		return FALSE;
 	}
 
 	// Create a mutex to control access to shared data.
-	yell("Creating mutex...");
+	log_text("Creating mutex...");
 
 	create_dummy_sa();
 	mutex_handle = CreateMutex(&sec_attrib, FALSE, MUTEX_NAME);
@@ -289,18 +289,18 @@ BOOL install_watchdog()
 
 	if (mutex_handle == NULL)
 	{
-		yell("ERROR: couldn't create mutex object.");
+		log_error(0, "Couldn't create mutex object.");
 		return FALSE;
 	}
 	else if (err == ERROR_ALREADY_EXISTS)
 	{
-		printf("ERROR: watchdog is already running. Please uninstall it first.");
+		log_error(0, "Watchdog is already running. Please uninstall it first.");
 		CloseHandle(mutex_handle);
 		return FALSE;
 	}
 
 	// Create a shared data structure to transfer parameters to the watchdog.
-	yell("Creating shared data...");
+	log_text("Creating shared data...");
 
 	create_dummy_sa();
 	map_file_handle = CreateFileMapping(INVALID_HANDLE_VALUE,
@@ -314,13 +314,13 @@ BOOL install_watchdog()
 
 	if (map_file_handle == NULL)
 	{
-		yell("ERROR: couldn't create map file.");
+		log_error(0, "Couldn't create map file.");
 		CloseHandle(mutex_handle);
 		return FALSE;
 	}
 	else if (err == ERROR_ALREADY_EXISTS)
 	{
-		yell("ERROR: map file already exists.");
+		log_error(0, "Map file already exists.");
 		CloseHandle(map_file_handle);
 		CloseHandle(mutex_handle);
 		return FALSE;
@@ -334,7 +334,7 @@ BOOL install_watchdog()
 
 	if (shared_mem_ptr == NULL)
 	{
-		yell("ERROR: couldn't create a view of the map file.");
+		log_error(0, "Couldn't create a view of the map file.");
 		CloseHandle(map_file_handle);
 		CloseHandle(mutex_handle);
 		return FALSE;
@@ -352,7 +352,7 @@ BOOL install_watchdog()
 	// Now inject the watchdog code to the host process.
 	if (inject_dll(pid, DLL_NAME) != TRUE)
 	{
-		yell("ERROR: couldn't inject watchdog code into host process.");
+		log_error(0, "Couldn't inject watchdog code into host process.");
 
 		UnmapViewOfFile(shared_mem_ptr);
 		CloseHandle(map_file_handle);
@@ -361,7 +361,7 @@ BOOL install_watchdog()
 		return FALSE;
 	}
 
-	printf("Watchdog was installed.");
+	log_text("Watchdog was installed.");
 
 	UnmapViewOfFile(shared_mem_ptr);
 	CloseHandle(map_file_handle);
@@ -383,7 +383,7 @@ BOOL unload_watchdogs()
 
 	if (mutex_handle == NULL)
 	{
-		yell("ERROR: couldn't open mutex. Error code %ld.", GetLastError());
+		log_error(0, "Couldn't open mutex. Error code %ld.", GetLastError());
 		return ret_val;
 	}
 
@@ -392,14 +392,14 @@ BOOL unload_watchdogs()
 	switch (wait_result)
 	{
 		case WAIT_OBJECT_0:
-			yell("Updating watchdog data...");
+			log_text("Updating watchdog data...");
 			map_file_handle = OpenFileMapping(FILE_MAP_ALL_ACCESS,
 					FALSE,
 					SHARED_MEM_NAME);
 
 			if (map_file_handle == NULL)
 			{
-				yell("ERROR: couldn't open map file. Error code %ld.", GetLastError());
+				log_error(0, "Couldn't open map file. Error code %ld.", GetLastError());
 			}
 			else
 			{
@@ -410,12 +410,10 @@ BOOL unload_watchdogs()
 						0);
 
 				if (shared_mem_ptr == NULL)
-				{
-					yell("ERROR: couldn't open shared memory. Error code %ld.", GetLastError());
-				}
+					log_error(0, "Couldn't open shared memory. Error code %ld.", GetLastError());
 				else
 				{
-					yell("Order watchdog to unload.");
+					log_text("Order watchdog to unload.");
 					shared_mem_ptr->unload = TRUE;
 					UnmapViewOfFile(shared_mem_ptr);
 					ret_val = TRUE;
@@ -428,7 +426,7 @@ BOOL unload_watchdogs()
 			break;
 
 		case WAIT_TIMEOUT:
-			yell("ERROR: couldn't get the mutex.");
+			log_error(0, "Couldn't get the mutex.");
 			return FALSE;
 	}
 
@@ -444,95 +442,92 @@ void exec_userinit()
 	GetEnvironmentVariable("Windir", userinit_path, _MAX_PATH);
 	strcat(userinit_path, "\\system32\\userinit.exe");
 	if (_spawnl(_P_NOWAIT, userinit_path, userinit_path, NULL) == (intptr_t) NULL)
-		do_log("(MAIN) Couldn't execute %s. Error code %d\n", userinit_path, errno);
+		log_error(errno, "Couldn't execute %s.", userinit_path);
 	else
-		do_log("(MAIN) Executed %s.\n", userinit_path);
+		log_text("Executed %s.", userinit_path);
 }
 
 void fix_sml_settings()
 {
+	unsigned char ipv4_b1, ipv4_b2, ipv4_b3, ipv4_b4;
 	FILE *f, *f2;
-	char *ip;
-	int attempts;
 	char sml_inf[_MAX_PATH];
 	char sml_inf2[_MAX_PATH];
 	int sml_pc_id;
 	char line[4000];
+	// Will try to get this computer's IP no more than 10 times.
+	int attempts = 10;
+	
+	log_text("Fixing Smartlaunch settings...");
 
-	printf("Fixing Smartlaunch settings...\n");
+	log_text("Getting current IP...");
 
-	yell("Getting current IP...");
-
-	if (!get_ip(&ip))
-	{
-		yell("ERROR: couldn't get the current IP. Networking may be down.");
-		return;
-	}
-
-	attempts = 10;
-
-	while (attempts && (_stricmp(ip, "127.0.0.1") == 0))
+	// Repeat attempts to get this computer's IP, until the IP is get, or max 
+	// attempts has been reached. Each attempt wait 10 seconds.
+	while (attempts && (!get_ipv4_bytes(&ipv4_b1, &ipv4_b2, &ipv4_b3, &ipv4_b4)))
 	{
 		attempts--;
 		Sleep(10000);
-		get_ip(&ip);
 	}
 
+	// Successfully get the IP? Then compute the client ID.
 	if (attempts)
 	{
-		sml_pc_id = atoi((char *)(strrchr(ip, '.') + 1));
-		yell("The client ID is %d.", sml_pc_id);
+		sml_pc_id = ipv4_b3 * 254 + ipv4_b4;
+		log_text("The client ID is %d.", sml_pc_id);
 	}
+	// Failed to get the IP? Log the incident.
 	else
 	{
-		yell("ERROR: couldn't get the current IP. Networking may be down.");
+		log_error(0, "Couldn't get the current IP. Networking may be down.");
 		return;
 	}
 
+	// Prepare to fix the client's configuration file.
+	// Build the path to the client's configuration file.
 	strcpy(sml_inf, sml_path);
 	strcat(sml_inf, "\\Data\\Inf\\Client.inf");
-
+	// Build the path to the temporary file.
 	strcpy(sml_inf2, sml_inf);
 	strcat(sml_inf2, ".fixed");
 
+	// Cannot open the client's configuration file? Log the incident.
 	if ((f = fopen(sml_inf, "r")) == NULL)
 	{
-		yell("ERROR: the Smartlaunch configuration file \"%s\" doesn't exist.\n", sml_inf);
+		log_error(0, "The Smartlaunch configuration file \"%s\" doesn't exist.", sml_inf);
 	}
+	// Successfully opened the client's configuration file.
 	else
 	{
+		// Try to open the temporary file for writing.
+		// Failed? Then we cannot fix the settings. So log the incident and quit this function.
 		if ((f2 = fopen(sml_inf2, "w")) == NULL)
 		{
 			fclose(f);
-			yell("ERROR: couldn't create temporary configuration file \"%s\".\n", sml_inf2);
-			yell("The Smartlaunch configuration file was NOT fixed.\n");
+			log_error(0, "Couldn't create temporary configuration file \"%s\".", sml_inf2);
+			log_error(0, "The Smartlaunch configuration file was NOT fixed.");
 			return;
 		}
-
-		while (fgets(line, sizeof(line), f) != NULL)
-		{
-			if (strstr(line, "ComputerNumber=") == line)
-			{
-				// Fix the computer number.
+		// Temporary file opened? Now copy content of the client's config file
+		// to the temporary file, line by line, and fix the settings on the fly.
+		while (fgets(line, sizeof(line), f) != NULL) {
+			// Fix the computer number.
+			if (strstr(line, "ComputerNumber=") == line) {
 				fprintf(f2, "ComputerNumber=%d\n", sml_pc_id);
 			}
-			else if (strstr(line, "ComputerName=") == line)
-			{
-				// Fix the computer name.
+			// Fix the computer name.
+			else if (strstr(line, "ComputerName=") == line) {
 				fprintf(f2, "ComputerName=PC%03d\n", sml_pc_id);
 			}
-			else
-			{
-				// Write line "as is".
-				fwrite(line, strlen(line), 1, f2);
-			}
+			// Copy as-is.
+			else fwrite(line, strlen(line), 1, f2);
 		}
 
 		fclose(f);
 		fclose(f2);
 		remove(sml_inf);
 		rename(sml_inf2, sml_inf);
-		yell("The Smartlaunch configuration file was fixed.\n");
+		log_text("The Smartlaunch configuration file was fixed.");
 	}
 }
 
@@ -565,12 +560,14 @@ BOOL create_dummy_sa()
       }
       else
       {
-         OutputDebugString ("CNDS: cannot set security descriptor DACL\n");
+         //OutputDebugString ("CNDS: cannot set security descriptor DACL\n");
+         log_error(0, "Cannot set security descriptor DACL.");
       }
    }
    else
    {
-      OutputDebugString("CNDS: cannot initialise security descriptor\n");
+      // OutputDebugString("CNDS: cannot initialise security descriptor\n");
+      log_error(0, "Cannot initialise security descriptor.");
    }
    return ret_val;
 }

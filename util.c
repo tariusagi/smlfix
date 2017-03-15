@@ -1,9 +1,9 @@
 #define _WIN32_WINDOWS 0x4100
+#include <winsock2.h>
 #include <windows.h>
 #include <stdio.h>
 #include <time.h>
 #include <tlhelp32.h>
-#include <winsock2.h>
 #include <psapi.h>
 #include <process.h>
 #include "smlfix.h"
@@ -82,75 +82,72 @@ BOOL verbose_flag = FALSE;
 BOOL log_flag = FALSE;
 char log_path[_MAX_PATH] = "";
 
-void yell(char* format, ...)
-{
-	char					buf[501];
-	va_list					argList;
-
-	if (!verbose_flag)
-		return;
-
-	// Compose the input and log it.
-	va_start(argList, format);
-	vsnprintf(buf, 500, format, argList);
-	va_end(argList);
-	printf("%s\n", buf);
-}
-
-// Output a formatted log text.
+// Print a text to the log file (if logging is on) and STDOUT (if verbose).
 // NOTE: the output log text is limitted at 500 characters.
-void do_log(char* format, ...)
+void log_text(char* format, ...)
 {
-	char					buf[501];
+	char					timestamp[9];
+	char					text[501];
 	time_t					t;
 	FILE*					f;
 	va_list					argList;
 
-	if (!log_flag)
+	// If both logging and verbose is off, then there's nothing to do.
+	if (!(log_flag || verbose_flag))
 		return;
 
-	if (!strlen(log_path))
-		return;
-	
-	// Now create/open the log file and write log content.
-	f = fopen(log_path, "a+");
-
-	if (f == NULL)
-		return;
-
-	// Retrieve current timestamp.
+	// Format the current timestamp.
 	t = time(NULL);
-	strftime(buf, 9, "%H:%M:%S", (const struct tm *)localtime(&t));
-	// Write the timestamp first.
-	fprintf(f, "%s", buf);
-	// Compose the input and log it.
+	strftime(timestamp, 9, "%H:%M:%S", (const struct tm *)localtime(&t));
+
+	// Build the text from input arguments.
 	va_start(argList, format);
-	vsnprintf(buf, 500, format, argList);
+	vsnprintf(text, 500, format, argList);
 	va_end(argList);
-	fprintf(f, ": %s\n", buf);
-	// Close the log file and flush all unwritten data.
-	fclose(f);
+
+	// Now if logging is on and the path to log file is set..
+	if (log_flag && strlen(log_path))
+	{
+		// ..create/open the log file and write log content.
+		if ((f = fopen(log_path, "a+")) != NULL)
+		{
+			fprintf(f, "%s - %s\n", timestamp, text);
+			fclose(f);
+		}
+	}
+
+	// And if verbose is on, then print the text to STDOUT, too.
+	if (verbose_flag)
+		printf("%s - %s\n", timestamp, text);
 }
 
 // Output a formatted log text along with the latest system error string for the
 // given system error code (in errno).
-// NOTE: the output log text is limitted at 500 characters.
-void do_error_log(DWORD err_no, char* format, ...)
+void log_error(DWORD err_no, char* format, ...)
 {
-	char					buf[501];
+	char					timestamp[9];
+	char					text[501];
 	time_t					t;
 	FILE*					f;
 	va_list					argList;
-	LPVOID					sys_msg_buf;
+	LPVOID					sys_msg_buf = NULL;
 
-	if (!log_flag)
+	// If both logging and verbose is off, then there's nothing to do.
+	if (!(log_flag || verbose_flag))
 		return;
 
-	if (!strlen(log_path))
-		return;
+	// Format the current timestamp.
+	t = time(NULL);
+	strftime(timestamp, 9, "%H:%M:%S", (const struct tm *)localtime(&t));
 
-	// First, get the system error string.
-	if (!FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+	// Build the text from input arguments.
+	va_start(argList, format);
+	vsnprintf(text, 500, format, argList);
+	va_end(argList);
+
+	// Get the system error string if err_no is not zero.
+	if (err_no)
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
 				  FORMAT_MESSAGE_FROM_SYSTEM | 
 				  FORMAT_MESSAGE_IGNORE_INSERTS,
 				  NULL, 
@@ -158,32 +155,34 @@ void do_error_log(DWORD err_no, char* format, ...)
 				  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 				  (LPTSTR) &sys_msg_buf, 
 				  0, 
-				  NULL))
+				  NULL);
+
+	// Now if logging is on and the path to log file is set..
+	if (log_flag && strlen(log_path))
 	{
-		do_log("(UTIL) Couldn't format message for system error code %d.", errno);
-		return;
+		// ..create/open the log file and write log content.
+		if ((f = fopen(log_path, "a+")) != NULL)
+		{
+			if (sys_msg_buf == NULL)
+				fprintf(f, "%s - ERROR: %s\n", timestamp, text);
+			else
+				fprintf(f, "%s - ERROR: %s. %s\n", timestamp, text, (char *) sys_msg_buf);
+			fclose(f);
+		}
 	}
 
-	// Now create/open the log file and write log content.
-	f = fopen(log_path, "a+");
+	// And if verbose is on, then print the text to STDERR, too.
+	if (verbose_flag)
+	{
+		if (sys_msg_buf == NULL)
+			fprintf(stderr, "%s - ERROR: %s\n", timestamp, text);
+		else
+			fprintf(stderr, "%s - ERROR: %s. %s\n", timestamp, text, (char *) sys_msg_buf);
+	}
 
-	if (f == NULL)
-		return;
-
-	// Retrieve current timestamp.
-	t = time(NULL);
-	strftime(buf, 9, "%H:%M:%S", (const struct tm *)localtime(&t));
-	// Write the timestamp first.
-	fprintf(f, "%s", buf);
-	// Compose the input and log it.
-	va_start(argList, format);
-	vsnprintf(buf, 500, format, argList);
-	va_end(argList);
-	fprintf(f, ": %s. %s", buf, (char *) sys_msg_buf);
-	// Close the log file and flush all unwritten data.
-	fclose(f);
-	// Free the system message buffer.
-	LocalFree(sys_msg_buf);
+	// Free the system message buffer if it's allocated.
+	if (sys_msg_buf != NULL)
+		LocalFree(sys_msg_buf);
 }
 
 void trim(char *s)
@@ -209,6 +208,7 @@ void trim(char *s)
 	}
 }
 
+// Retrieve current IPv4 into a string.
 BOOL get_ip(char **ip)
 {
 	WORD winsock_version = MAKEWORD(2,0);
@@ -218,27 +218,66 @@ BOOL get_ip(char **ip)
 
 	if (WSAStartup(winsock_version, &winsock_data) != 0)
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to initialize Winsock 2 library");
+		log_error(GetLastError(), "Failed to initialize Winsock 2 library");
 		return FALSE;
 	}
 
 	if (gethostname(host_name, sizeof(host_name) - 1) != 0)
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to query local hostname");
+		log_error(GetLastError(), "Failed to query local hostname");
 		WSACleanup();
 		return FALSE;
 	}
 
-	do_log("(UTIL) The current host name: \"%s\".", host_name);
+	log_text("The current host name: \"%s\".", host_name);
 	if ((host_info = gethostbyname(host_name)) == NULL)
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to query host info");
+		log_error(GetLastError(), "Failed to query host info");
 		WSACleanup();
 		return FALSE;
 	} 
 
 	*ip = inet_ntoa(*((struct in_addr *)host_info->h_addr_list[0]));
-	do_log("(UTIL) The current IP: %s.", *ip);
+	log_text("The current IP: %s.", *ip);
+	WSACleanup();
+	return TRUE;
+}
+
+// Retrieve current IPv4 into 4 bytes.
+BOOL get_ipv4_bytes(unsigned char *b1, unsigned char *b2, unsigned char *b3, unsigned char *b4)
+{
+	WORD winsock_version = MAKEWORD(2,0);
+	WSADATA winsock_data;
+	char host_name[65];
+	LPHOSTENT host_info;
+
+	if (WSAStartup(winsock_version, &winsock_data) != 0)
+	{
+		log_error(GetLastError(), "Failed to initialize Winsock 2 library");
+		return FALSE;
+	}
+
+	if (gethostname(host_name, sizeof(host_name) - 1) != 0)
+	{
+		log_error(GetLastError(), "Failed to query local hostname");
+		WSACleanup();
+		return FALSE;
+	}
+
+	log_text("The current host name: \"%s\".", host_name);
+	if ((host_info = gethostbyname(host_name)) == NULL)
+	{
+		log_error(GetLastError(), "Failed to query host info");
+		WSACleanup();
+		return FALSE;
+	} 
+	
+	*b1 = ((struct in_addr *)host_info->h_addr_list[0])->S_un.S_un_b.s_b1;
+	*b2 = ((struct in_addr *)host_info->h_addr_list[0])->S_un.S_un_b.s_b2;
+	*b3 = ((struct in_addr *)host_info->h_addr_list[0])->S_un.S_un_b.s_b3;
+	*b4 = ((struct in_addr *)host_info->h_addr_list[0])->S_un.S_un_b.s_b4;
+
+	log_text("The current IP: %d.%d.%d.%d", *b1, *b2, *b3, *b4);
 	WSACleanup();
 	return TRUE;
 }
@@ -254,7 +293,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 	// Open this process' token. 
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to open process token");
+		log_error(GetLastError(), "Failed to open process token");
 		return -1;
 	}
 	// Get the LUID for the inject DLL (DEBUG) privilege. 
@@ -267,7 +306,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 	// Cannot test the return value of AdjustTokenPrivileges. 
 	if (GetLastError() != ERROR_SUCCESS) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to adjust debug privilege");
+		log_error(GetLastError(), "Failed to adjust debug privilege");
 		return -1;
 	}
 
@@ -275,7 +314,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 
 	if(!proccess_handle)
 	{
-		do_error_log(GetLastError(), "(UTIL) Couldn't open host process");
+		log_error(GetLastError(), "Couldn't open host process");
 		return -1;
 	}
 
@@ -285,7 +324,7 @@ DWORD inject_dll(DWORD pid, const char *name)
 
 	if (load_lib_address == NULL)
 	{
-		do_error_log(GetLastError(), "(UTIL) Couldn't get LoadLibraryA address");
+		log_error(GetLastError(), "Couldn't get LoadLibraryA address");
 		return -1;
 	}
 
@@ -314,25 +353,20 @@ DWORD inject_dll(DWORD pid, const char *name)
 
 	if (thread_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(UTIL) Couldn't create remote thread");
+		log_error(GetLastError(), "Couldn't create remote thread");
 		return -1;
 	}
 	else
-		do_log("(UTIL) Remote thread was created.");
+		log_text("Remote thread was created.");
 
 	WaitForSingleObject(thread_handle, INFINITE);
 	GetExitCodeThread(thread_handle, &ret_val);
-
-	if ((HMODULE)ret_val == NULL)
-		ret_val = FALSE;
-	else
-		ret_val = TRUE;
 
 	CloseHandle(thread_handle);
 	VirtualFreeEx(proccess_handle, dll_name , strlen(name) + 1, MEM_RELEASE);
 	CloseHandle(proccess_handle);
 
-	return ret_val;
+	return ret_val == 0 ? FALSE : TRUE;
 } 
 
 // Set DEBUG privilege to the calling process.
@@ -345,7 +379,7 @@ BOOL set_debug_priv()
 	// Open the calling process' token. 
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to open process token");
+		log_error(GetLastError(), "Failed to open process token");
 		return FALSE;
 	}
 	// Get the LUID for the inject DLL (DEBUG) privilege. 
@@ -356,7 +390,7 @@ BOOL set_debug_priv()
 	// Set the privilege.
 	if (!AdjustTokenPrivileges(token_handle, FALSE, &token_privilege, 0, (PTOKEN_PRIVILEGES)NULL, 0)) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to adjust debug privilege");
+		log_error(GetLastError(), "Failed to adjust debug privilege");
 		return FALSE;
 	}
 	else return TRUE;
@@ -371,7 +405,7 @@ void force_reboot(int action)
 	// Get a token for this process. 
 	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token_handle)) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to open process token");
+		log_error(GetLastError(), "Failed to open process token");
 		return;
 	}
 	// Get the LUID for the shutdown privilege. 
@@ -383,14 +417,14 @@ void force_reboot(int action)
 	// Cannot test the return value of AdjustTokenPrivileges. 
 	if (GetLastError() != ERROR_SUCCESS) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Failed to adjust shutdown privilege");
+		log_error(GetLastError(), "Failed to adjust shutdown privilege");
 		return;
 	}
 	// Gonna reboot using system's shutdown command?
 	if (action == ACTION_REBOOT2)
 	{
 		reboot_using_shutdown_cmd();
-		do_log("(UTIL) Forced a reboot using shutdown.exe.");
+		log_text("Forced a reboot using shutdown.exe.");
 	}
 	else
 	{
@@ -410,17 +444,17 @@ void force_reboot(int action)
 		}
 		// Reboot the system and force all applications to close. 
 		if (!ExitWindowsEx(flags, 0))
-			do_error_log(GetLastError(), "(UTIL) Failed to force a reboot");
+			log_error(GetLastError(), "Failed to force a reboot");
 		else switch (action)
 		{
 			case ACTION_LOGOFF:
-				do_log("(UTIL) Forced a log off.");
+				log_text("Forced a log off.");
 				break;
 			case ACTION_REBOOT:
-				do_log("(UTIL) Forced a reboot.");
+				log_text("Forced a reboot.");
 				break;
 			case ACTION_SHUTDOWN:
-				do_log("(UTIL) Forced a shutdown.");
+				log_text("Forced a shutdown.");
 				break;
 		}
 	}
@@ -452,17 +486,20 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 	else
 		strcpy(file_name, path);
 
-	if (is_full_path)
-		do_log("(UTIL) Getting PID from (full path) %s.", path);
-	else
-		do_log("(UTIL) Getting PID from %s.", file_name);
+	if (verbose_flag)
+	{
+		if (is_full_path)
+			log_text("Getting PID from (full path) %s.", path);
+		else
+			log_text("Getting PID from %s.", file_name);
+	}
 
 	GetShortPathNameA(path, short_path, MAX_PATH);
 
 	if (!Process32First(snapshot_handle, &process_entries))
 	{
 		CloseHandle(snapshot_handle);
-		do_error_log(GetLastError(), "(UTIL) Unable to query processes list");
+		log_error(GetLastError(), "Unable to query processes list");
 		return 0;
 	}
 
@@ -529,11 +566,11 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 			else
 			{
 				CloseHandle(snapshot_handle);
-				do_error_log(GetLastError(), "(UTIL) Couldn't open handle to process ID %d", process_entries.th32ProcessID);
+				log_error(GetLastError(), "Couldn't open handle to process ID %d", process_entries.th32ProcessID);
 				return 0;
 			}
 
-			if (pid) do_log("(UTIL) Found PID %d.", pid);
+			if (pid) log_text("Found PID %d.", pid);
 
 			if (pid && (session_id != -1))
 			{
@@ -541,11 +578,11 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 				// We need to check its session.
 				DWORD session_id2;
 
-				do_log("(UTIL) Checking session from PID %d against SID %d...", pid, session_id);
+				log_text("Checking session from PID %d against SID %d...", pid, session_id);
 
 				if (!ProcessIdToSessionId(pid, &session_id2))
 				{
-					do_error_log(GetLastError(), "(UTIL) Couldn't get session ID from PID %d", process_entries.th32ProcessID);
+					log_error(GetLastError(), "Couldn't get session ID from PID %d", process_entries.th32ProcessID);
 					CloseHandle(process_handle);
 					return 0;
 				}
@@ -553,10 +590,10 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 				if (session_id != session_id2)
 				{
 					pid = 0;
-					do_log("(UTIL) PID %d is in session %d, doesn't match SID %d.", pid, session_id2, session_id);
+					log_text("PID %d is in session %d, doesn't match SID %d.", pid, session_id2, session_id);
 				}
 				else
-					do_log("(UTIL) PID %d is in session %d, match SID %d.", pid, session_id2, session_id);
+					log_text("PID %d is in session %d, match SID %d.", pid, session_id2, session_id);
 			}
 
 			CloseHandle(process_handle);
@@ -620,7 +657,7 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
 
     if (mod_snap == INVALID_HANDLE_VALUE) 
 	{
-		do_error_log(GetLastError(), "(UTIL) Couldn't get module snapshot of PID %u", pid);
+		log_error(GetLastError(), "Couldn't get module snapshot of PID %u", pid);
         return FALSE; 
 	}
 
@@ -632,7 +669,7 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
         { 
 			if (GetLongPathName(mod_snap_entry.szExePath, full_path, sizeof(full_path)))
 			{
-				do_log("(UTIL) %u has module %s", pid, full_path);
+				log_text("%u has module %s", pid, full_path);
 
 				if (_stricmp(full_path, exe_path) == 0) 
 				{
@@ -658,8 +695,8 @@ void reboot_using_shutdown_cmd()
 	GetEnvironmentVariable("Windir", shutdown_cmd_path, _MAX_PATH);
 	strcat(shutdown_cmd_path, "\\system32\\shutdown.exe");
 	if (_spawnl(_P_NOWAIT, shutdown_cmd_path, shutdown_cmd_path, "/r", "/t", "0", NULL) == (intptr_t) NULL)
-		do_log("(MAIN) Couldn't execute %s. Error code %d\n", shutdown_cmd_path, errno);
+		log_text("(MAIN) Couldn't execute %s. Error code %d\n", shutdown_cmd_path, errno);
 	else
-		do_log("(MAIN) Executed %s.\n", shutdown_cmd_path);
+		log_text("(MAIN) Executed %s.\n", shutdown_cmd_path);
 }
 

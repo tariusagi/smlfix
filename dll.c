@@ -67,6 +67,7 @@ void init_watchdog()
 			0);
 
 	log_flag = shared_mem_ptr->disable_logging;
+	verbose_flag = shared_mem_ptr->verbose;
 	strcpy(log_path, shared_mem_ptr->log_path);
 }
 
@@ -78,12 +79,12 @@ void terminate_watchdog()
 
 	if (watchdog2_handle != NULL)
 	{
-		do_log("(WATCHDOG) Terminated secondary watchdog.");
+		log_text("Secondary watchdog terminated.");
 		TerminateThread(watchdog2_handle, 0);
 		CloseHandle(watchdog2_handle);
 	}
 
-	do_log("(WATCHDOG) Terminated.");
+	log_text("Watchdog terminated.");
 
 	FreeLibraryAndExitThread(GetModuleHandle(DLL_NAME), 0);
 }
@@ -107,7 +108,7 @@ DWORD WINAPI watchdog_func(LPVOID data)
 	ProcessIdToSessionId(GetCurrentProcessId(), &session_id);
 	install_watchdog2(get_pid_from_path(SECONDARY_HOST, session_id));
 
-	do_log("(WATCHDOG) Watchdog is running (TID %ld)...", GetCurrentThreadId());
+	log_text("(WATCHDOG) Thread ID %ld is running...", GetCurrentThreadId());
 
 	// Main loop.
 	while (!unload)
@@ -122,34 +123,34 @@ DWORD WINAPI watchdog_func(LPVOID data)
 				if ((sml_pid = get_pid_from_path(sml_exe, -1)) == 0)
 				{
 					sml_countdown--;
-					do_log("(WATCHDOG) Counting down at %d...", sml_countdown);
+					log_text("(WATCHDOG) Counting down at %d...", sml_countdown);
 
 					if (sml_countdown == 0)
 					{
-						do_log("(WATCHDOG) Countdown reached zero.");
+						log_text("(WATCHDOG) Counted to zero.");
 
 						switch (shared_mem_ptr->watchdog_action)
 						{
 							case ACTION_LOGOFF:
-								do_log("(WATCHDOG) Force logging off now.");
+								log_text("(WATCHDOG) Force logging off now.");
 								force_reboot(ACTION_LOGOFF);
 								unload = TRUE;
 								break;
 
 							case ACTION_REBOOT:
-								do_log("(WATCHDOG) Force reboot now.");
+								log_text("(WATCHDOG) Force reboot now.");
 								force_reboot(ACTION_REBOOT);
 								unload = TRUE;
 								break;
 
 							case ACTION_REBOOT2:
-								do_log("(WATCHDOG) Force a reboot now using system shutdown command.");
+								log_text("(WATCHDOG) Force a reboot now using system shutdown command.");
 								force_reboot(ACTION_REBOOT2);
 								unload = TRUE;
 								break;
 
 							case ACTION_SHUTDOWN:
-								do_log("(WATCHDOG) Force shutdown now.");
+								log_text("(WATCHDOG) Force shutdown now.");
 								force_reboot(ACTION_SHUTDOWN);
 								unload = TRUE;
 								break;
@@ -162,13 +163,13 @@ DWORD WINAPI watchdog_func(LPVOID data)
 				}
 				else
 				{
-					do_log("(WATCHDOG) Smartlaunch came back, PID %u", sml_pid);
+					log_text("(WATCHDOG) Smartlaunch came back, PID %u", sml_pid);
 					sml_missing = FALSE;
 					sml_handle = OpenProcess(SYNCHRONIZE, FALSE, sml_pid);
 
 					if (sml_handle == NULL)
 					{
-						do_error_log(GetLastError(), "(WATCHDOG) Couldn't open Smartlaunch process");
+						log_error(GetLastError(), "(WATCHDOG) Couldn't open Smartlaunch process");
 						// Unload for being useless now.
 						break;
 					}
@@ -185,7 +186,7 @@ DWORD WINAPI watchdog_func(LPVOID data)
 					sml_missing = TRUE;
 					// Set the countdown.
 					sml_countdown = shared_mem_ptr->countdown;
-					do_log("(WATCHDOG) Smartlaunch went missing. Started counting down at %d.", sml_countdown);
+					log_text("(WATCHDOG) Smartlaunch went missing. Started counting down at %d.", sml_countdown);
 				}
 				else
 				{
@@ -198,14 +199,14 @@ DWORD WINAPI watchdog_func(LPVOID data)
 		{
 			if ((sml_pid = get_pid_from_path(sml_exe, -1)) != 0)
 			{
-				do_log("(WATCHDOG) Smartlaunch was launched, PID %u", sml_pid);
+				log_text("(WATCHDOG) Smartlaunch was launched, PID %u", sml_pid);
 				sml_launched = TRUE;
 				sml_missing = FALSE;
 				sml_handle = OpenProcess(SYNCHRONIZE, FALSE, sml_pid);
 
 				if (sml_handle == NULL)
 				{
-					do_error_log(GetLastError(), "(WATCHDOG) Couldn't open Smartlaunch process");
+					log_error(GetLastError(), "(WATCHDOG) Couldn't open Smartlaunch process");
 					// Unload for being useless now.
 					unload = TRUE;
 				}
@@ -231,12 +232,12 @@ DWORD WINAPI watchdog_func(LPVOID data)
 
 					// The secondary watchdog was killed. Re-install it.
 					install_watchdog2(get_pid_from_path(SECONDARY_HOST, session_id));
-					do_log("(WATCHDOG) Second watchdog was re-installed.");
+					log_text("(WATCHDOG) Second watchdog was re-installed.");
 				}
 			}
 
 			// Checking for unload flag.
-			do_log("(WATCHDOG) Checking for unload flag...");
+			// log_text("(WATCHDOG) Checking for unload flag...");
 			wait_result = WaitForSingleObject(mutex_handle, 1000);
 
 			switch (wait_result)
@@ -247,7 +248,7 @@ DWORD WINAPI watchdog_func(LPVOID data)
 					break;
 
 				case WAIT_TIMEOUT:
-					do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the mutex");
+					log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the mutex");
 					unload = TRUE;
 					break;
 			}
@@ -284,7 +285,7 @@ BOOL WINAPI DllMain (HANDLE hDll, DWORD dwReason, LPVOID lpReserved)
 						 0, 0, 0, 0, 0, 0, 0,
 						 &pEveryoneSID))
 		{
-			do_error_log(GetLastError(), "(DLL) AllocateAndInitializeSid failed");
+			log_error(GetLastError(), "(DLL) AllocateAndInitializeSid failed");
 			return FALSE;
 		}
 
@@ -303,7 +304,7 @@ BOOL WINAPI DllMain (HANDLE hDll, DWORD dwReason, LPVOID lpReserved)
 		// Create a new ACL that contains the new ACEs.
 		dwRes = SetEntriesInAcl(1, ea, NULL, &pACL);
 		if (ERROR_SUCCESS != dwRes) {
-			do_error_log(GetLastError(), "(DLL) SetEntriesInAcl failed");
+			log_error(GetLastError(), "(DLL) SetEntriesInAcl failed");
 			goto Cleanup;
 		}
 
@@ -311,13 +312,13 @@ BOOL WINAPI DllMain (HANDLE hDll, DWORD dwReason, LPVOID lpReserved)
 		pSD = (PSECURITY_DESCRIPTOR) LocalAlloc(LPTR, 
 								 SECURITY_DESCRIPTOR_MIN_LENGTH); 
 		if (pSD == NULL) { 
-			do_error_log(GetLastError(), "(DLL) LocalAlloc failed");
+			log_error(GetLastError(), "(DLL) LocalAlloc failed");
 			ret_val = FALSE;
 			goto Cleanup; 
 		} 
 		 
 		if (!InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION)) {  
-			do_error_log(GetLastError(), "(DLL) InitializeSecurityDescriptor failed");
+			log_error(GetLastError(), "(DLL) InitializeSecurityDescriptor failed");
 			goto Cleanup; 
 		} 
 		 
@@ -327,7 +328,7 @@ BOOL WINAPI DllMain (HANDLE hDll, DWORD dwReason, LPVOID lpReserved)
 				pACL, 
 				FALSE))   // not a default DACL 
 		{  
-			do_error_log(GetLastError(), "(DLL) SetSecurityDescriptorDacl failed");
+			log_error(GetLastError(), "(DLL) SetSecurityDescriptorDacl failed");
 			ret_val = FALSE;
 			goto Cleanup; 
 		} 
@@ -341,7 +342,7 @@ BOOL WINAPI DllMain (HANDLE hDll, DWORD dwReason, LPVOID lpReserved)
 		// watchdog thread.
 		if (CreateThread(&sa, 0, watchdog_func, 0, 0, NULL) == NULL)
 		{
-			do_error_log(GetLastError(), "(DLL) Couldn't create the primary watchdog thread");
+			log_error(GetLastError(), "(DLL) Couldn't create the primary watchdog thread");
 			ret_val = FALSE;
 		}
 
@@ -392,10 +393,11 @@ static DWORD WINAPI watchdog2_func(inject_data_ptr_t inject_data)
 			if (wait_result == WAIT_TIMEOUT)
 			{
 				// The host process is still alive.
-				// So this was an attacke. Take an action!!!
-				if (inject_data->action == ACTION_REBOOT)
+				// So this was an attack! Take an action!
+				if ((inject_data->action == ACTION_REBOOT)
+					|| (inject_data->action == ACTION_REBOOT2))
 				{
-					// Kill myself process to force Windows to reboot.
+					// Kill own process to force a reboot or cause a BSOD.
 					inject_data->terminate_process(inject_data->get_current_process(), 0);
 				}
 
@@ -431,11 +433,11 @@ BOOL install_watchdog2(DWORD pid)
 	BYTE		*remote_data_ptr;
 	DWORD		*remote_code_ptr;
 	DWORD		watchdog2_tid = 0;
-	DWORD 		written_bytes = 0;
+	SIZE_T 		written_bytes = 0;
 	int			code_size;
 	inject_data_t	local_data;
 
-	do_log("(WATCHDOG) Installing secondary watchdog to PID %ld...", pid);
+	log_text("(WATCHDOG) Installing secondary watchdog to PID %ld...", pid);
 
 	process_handle = OpenProcess(
 		PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION 
@@ -444,7 +446,7 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (process_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't open host process");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't open host process");
 		return FALSE;
 	}
 
@@ -458,14 +460,14 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (kernel32_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get handle to kernel32 module");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get handle to kernel32 module");
 		return FALSE;
 	}
 
 	local_data.get_last_error = (GETLASTERROR) GetProcAddress(kernel32_handle, "GetLastError");
 	if (local_data.get_last_error == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of GetLastError");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of GetLastError");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -474,7 +476,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.load_library = (LOADLIBRARY) GetProcAddress(kernel32_handle, "LoadLibraryA");
 	if (local_data.load_library == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of LoadLibrary");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of LoadLibrary");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -483,7 +485,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.open_thread = (OPENTHREAD) GetProcAddress(kernel32_handle, "OpenThread");
 	if (local_data.open_thread == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenThread");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenThread");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -492,7 +494,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.open_process = (OPENTHREAD) GetProcAddress(kernel32_handle, "OpenProcess");
 	if (local_data.open_process == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenProcess");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenProcess");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -501,7 +503,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.resume_thread = (RESUMETHREAD) GetProcAddress(kernel32_handle, "ResumeThread");
 	if (local_data.resume_thread == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of ResumeThread");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of ResumeThread");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -510,7 +512,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.open_mutex = (OPENMUTEX) GetProcAddress(kernel32_handle, "OpenMutexA");
 	if (local_data.open_mutex == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenMutex");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenMutex");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -519,7 +521,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.wait_singe_object = (WAITSINGLEOBJECT) GetProcAddress(kernel32_handle, "WaitForSingleObject");
 	if (local_data.wait_singe_object == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of WaitForSingleObject");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of WaitForSingleObject");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -528,7 +530,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.close_handle = (CLOSEHANDLE) GetProcAddress(kernel32_handle, "CloseHandle");
 	if (local_data.close_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of CloseHandle");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of CloseHandle");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -537,7 +539,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.sleep = (SLEEP) GetProcAddress(kernel32_handle, "Sleep");
 	if (local_data.sleep == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of Sleep");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of Sleep");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -546,7 +548,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.get_current_process_id = (GETCURRENTPROCESSID) GetProcAddress(kernel32_handle, "GetCurrentProcessId");
 	if (local_data.get_current_process_id == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of GetCurrentProcessId");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of GetCurrentProcessId");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -555,7 +557,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.get_current_process = (GETCURRENTPROCESS) GetProcAddress(kernel32_handle, "GetCurrentProcess");
 	if (local_data.get_current_process == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of GetCurrentProcess");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of GetCurrentProcess");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -564,7 +566,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.terminate_process = (TERMINATEPROCESS) GetProcAddress(kernel32_handle, "TerminateProcess");
 	if (local_data.terminate_process == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of TerminateProcess");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of TerminateProcess");
 		CloseHandle(process_handle);
 		CloseHandle(kernel32_handle);
 		return FALSE;
@@ -577,14 +579,14 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (user32_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get handle to user32 module");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get handle to user32 module");
 		return FALSE;
 	}
 
 	local_data.exit_windows_ex = (EXITWINDOWSEX) GetProcAddress(kernel32_handle, "ExitWindowsExA");
 	if (local_data.get_current_process == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of ExitWindowsEx");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of ExitWindowsEx");
 		CloseHandle(process_handle);
 		CloseHandle(user32_handle);
 		return FALSE;
@@ -597,14 +599,14 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (advapi32_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get handle to advapi32 module");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get handle to advapi32 module");
 		return FALSE;
 	}
 
 	local_data.open_process_token = (OPENPROCESSTOKEN) GetProcAddress(advapi32_handle, "OpenProcessToken");
 	if (local_data.open_process_token == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenProcessToken");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of OpenProcessToken");
 		CloseHandle(process_handle);
 		CloseHandle(advapi32_handle);
 		return FALSE;
@@ -613,7 +615,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.lookup_privilege_value = (LOOKUPPRIVILEGEVALUE) GetProcAddress(advapi32_handle, "LookupPrivilegeValueA");
 	if (local_data.lookup_privilege_value == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of LookupPrivilegeValue");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of LookupPrivilegeValue");
 		CloseHandle(process_handle);
 		CloseHandle(advapi32_handle);
 		return FALSE;
@@ -622,7 +624,7 @@ BOOL install_watchdog2(DWORD pid)
 	local_data.adjust_token_privileges = (ADJUSTTOKENPRIVILEGES) GetProcAddress(advapi32_handle, "AdjustTokenPrivileges");
 	if (local_data.adjust_token_privileges == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of AdjustTokenPrivileges");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't get the address of AdjustTokenPrivileges");
 		CloseHandle(process_handle);
 		CloseHandle(advapi32_handle);
 		return FALSE;
@@ -639,7 +641,7 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (remote_data_ptr == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't allocate memory for injecting data");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't allocate memory for injecting data");
 		CloseHandle(process_handle);
 		return FALSE;
 	}
@@ -663,7 +665,7 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (remote_code_ptr == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't allocate memory for injecting code");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't allocate memory for injecting code");
 		CloseHandle(process_handle);
 		return FALSE;
 	}
@@ -677,7 +679,7 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (!set_debug_priv())
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't set debug privilege");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't set debug privilege");
 		CloseHandle(process_handle);
 		return FALSE;
 	}
@@ -691,7 +693,7 @@ BOOL install_watchdog2(DWORD pid)
 
 	if (watchdog2_handle == NULL)
 	{
-		do_error_log(GetLastError(), "(WATCHDOG) ERROR: couldn't create remote thread for injected code");
+		log_error(GetLastError(), "(WATCHDOG) ERROR: couldn't create remote thread for injected code");
 		CloseHandle(process_handle);
 		return FALSE;
 	}
@@ -699,7 +701,7 @@ BOOL install_watchdog2(DWORD pid)
 	// I don't wait until the remote thread terminate.
 	CloseHandle(process_handle);
 
-	do_log("(WATCHDOG) Secondary watchdog was installed (TID %ld).", watchdog2_tid);
+	log_text("(WATCHDOG) Secondary watchdog was installed (TID %ld).", watchdog2_tid);
 
 	return TRUE;
 }
