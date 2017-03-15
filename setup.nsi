@@ -1,16 +1,18 @@
 !define productName "Smartlaunch Fix"
 !define baseName "smlfix"
-!define productVersion "0.8.3.0"
+!define productVersion "0.9.0.0"
 
 Name "Smartlaunch Fix Service Setup"
-OutFile "${baseName}_${productVersion}.exe"
-InstallDir "$WINDIR\system32"
+OutFile "${baseName}_${productVersion}_x64.exe"
+InstallDir "$WINDIR"
 
 section
+	# Make sure we're working with 64 version of Windows' registry.
+	SetRegView 64
 	SetOutPath $INSTDIR
 	# Check if smlfix was already installed.
 	IfFileExists "$INSTDIR\${baseName}.exe" 0 install
-	MessageBox MB_YESNO "${productName} was already installed. Do you want to uninstall it?" IDNO cancel 
+	MessageBox MB_YESNO "${productName} was already installed at $INSTDIR. Do you want to uninstall it?" IDNO cancel 
 	ExecWait '$INSTDIR\${baseName}.exe -u'
 	Sleep 2000
 	Delete '$INSTDIR\${baseName}.exe'
@@ -19,7 +21,7 @@ section
 	MessageBox MB_OK "The old ${productName} was UNINSTALLED!"
 
 	install:
-	MessageBox MB_YESNO "Do you want to INSTALL ${productName} now?" IDNO cancel 
+	MessageBox MB_YESNO "Do you want to INSTALL ${productName} to $INSTDIR now?" IDNO cancel 
 	File ${baseName}.exe
 	File ${baseName}.dll
 	WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "Userinit" "$INSTDIR\${baseName}.exe -efw -a reboot2,"

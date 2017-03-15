@@ -1,7 +1,7 @@
 #ifndef _SMLFIX_H
 #define _SMLFIX_H
 
-#define DLL_NAME			"C:\\Windows\\system32\\smlfix.dll"
+#define DLL_NAME			"C:\\Windows\\smlfix.dll"
 #define SHARED_MEM_NAME		"smlfixshm"
 #define MUTEX_NAME			"smlfixmutex"
 #define SECONDARY_HOST		"C:\\Windows\\system32\\csrss.exe"
