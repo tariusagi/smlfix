@@ -166,7 +166,7 @@ void log_error(DWORD err_no, char* format, ...)
 			if (sys_msg_buf == NULL)
 				fprintf(f, "%s - ERROR: %s\n", timestamp, text);
 			else
-				fprintf(f, "%s - ERROR: %s. %s\n", timestamp, text, (char *) sys_msg_buf);
+				fprintf(f, "%s - ERROR: %s. %s", timestamp, text, (char *) sys_msg_buf);
 			fclose(f);
 		}
 	}
@@ -177,7 +177,7 @@ void log_error(DWORD err_no, char* format, ...)
 		if (sys_msg_buf == NULL)
 			fprintf(stderr, "%s - ERROR: %s\n", timestamp, text);
 		else
-			fprintf(stderr, "%s - ERROR: %s. %s\n", timestamp, text, (char *) sys_msg_buf);
+			fprintf(stderr, "%s - ERROR: %s. %s", timestamp, text, (char *) sys_msg_buf);
 	}
 
 	// Free the system message buffer if it's allocated.
@@ -505,11 +505,14 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 
 	do
 	{
+		// Found an entry which match the given file name.
 		if (_stricmp(file_name, process_entries.szExeFile) == 0)
 		{
-			HANDLE process_handle;
-
-			process_handle = OpenProcess
+			log_text("Found PID %d match %s."
+					, process_entries.th32ProcessID
+					, file_name);
+		
+			HANDLE process_handle = OpenProcess
 				( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
 				, FALSE
 				, process_entries.th32ProcessID);
