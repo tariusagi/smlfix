@@ -1,6 +1,6 @@
 !define productName "Smartlaunch Fix"
 !define baseName "smlfix"
-!define productVersion "0.9.0.0"
+!define productVersion "0.9.1.0"
 
 Name "Smartlaunch Fix Service Setup"
 OutFile "${baseName}_${productVersion}.exe"

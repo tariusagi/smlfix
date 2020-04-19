@@ -99,7 +99,7 @@ DWORD WINAPI watchdog_func(LPVOID data)
 	int sml_countdown = 0;
 	BOOL unload = FALSE;
 	DWORD wait_result;
-	char sml_exe[_MAX_PATH];
+	char sml_exe[MAX_PATH];
 
 	strcpy(sml_exe, shared_mem_ptr->sml_path);
 	strcat(sml_exe, "\\Client.exe");

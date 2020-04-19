@@ -41,8 +41,8 @@ int countdown_flag = 10;
 action_t watchdog_action_flag = ACTION_IGNORE;
 BOOL install_watchdog_flag = FALSE;
 BOOL unload_watchdog_flag = FALSE;
-char sml_path[_MAX_PATH] = "";
-char host_path[_MAX_PATH] = "";
+char sml_path[MAX_PATH] = "";
+char host_path[MAX_PATH] = "";
 
 shared_mem_t *shmem = NULL;
 
@@ -113,13 +113,13 @@ int main(int argc, char **argv)
 
 void init_settings()
 {
-	GetEnvironmentVariable("ProgramFiles", sml_path, _MAX_PATH);
+	GetEnvironmentVariable("ProgramFiles", sml_path, MAX_PATH);
 	strcat(sml_path, "\\Smartlaunch\\Client");
 
-	GetEnvironmentVariable("Windir", log_path, _MAX_PATH);
+	GetEnvironmentVariable("Windir", log_path, MAX_PATH);
 	strcat(log_path, "\\smlfix.log");
 
-	GetEnvironmentVariable("Windir", host_path, _MAX_PATH);
+	GetEnvironmentVariable("Windir", host_path, MAX_PATH);
 	strcat(host_path, "\\system32\\winlogon.exe");
 }
 
@@ -437,11 +437,11 @@ BOOL unload_watchdogs()
 
 void exec_userinit()
 {
-	char userinit_path[_MAX_PATH];
+	char userinit_path[MAX_PATH];
 
-	GetEnvironmentVariable("Windir", userinit_path, _MAX_PATH);
+	GetEnvironmentVariable("Windir", userinit_path, MAX_PATH);
 	strcat(userinit_path, "\\system32\\userinit.exe");
-	if (_spawnl(_P_NOWAIT, userinit_path, userinit_path, NULL) == (intptr_t) NULL)
+	if (spawnl(_P_NOWAIT, userinit_path, userinit_path, NULL) == (intptr_t) NULL)
 		log_error(errno, "Couldn't execute %s.", userinit_path);
 	else
 		log_text("Executed %s.", userinit_path);
@@ -451,8 +451,8 @@ void fix_sml_settings()
 {
 	unsigned char ipv4_b1, ipv4_b2, ipv4_b3, ipv4_b4;
 	FILE *f, *f2;
-	char sml_inf[_MAX_PATH];
-	char sml_inf2[_MAX_PATH];
+	char sml_inf[MAX_PATH];
+	char sml_inf2[MAX_PATH];
 	int sml_pc_id;
 	char line[4000];
 	// Will try to get this computer's IP no more than 10 times.

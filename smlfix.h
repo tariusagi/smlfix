@@ -18,20 +18,20 @@ typedef struct
 {
 	BOOL		verbose;
 	BOOL		disable_logging;
-	char		log_path[_MAX_PATH];
+	char		log_path[MAX_PATH];
 	// Countdown number before taking action.
 	int			countdown;
 	// Action to take when Sml is attacked.
 	action_t	watchdog_action;
 	// Full path to Sml installed folder.
-	char		sml_path[_MAX_PATH];
+	char		sml_path[MAX_PATH];
 	// Set this to TRUE to unload the watchdog.
 	BOOL		unload;
 } shared_mem_t;
 
 extern BOOL verbose_flag;
 extern BOOL log_flag;
-extern char log_path[_MAX_PATH];
+extern char log_path[MAX_PATH];
 
 void trim(char *s);
 void log_text(char* format, ...);

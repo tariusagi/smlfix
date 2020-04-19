@@ -80,7 +80,7 @@ typedef LONG (WINAPI *ZWQUERYSYSTEMINFORMATION)(UINT SystemInformationClass, PVO
 
 BOOL verbose_flag = FALSE;
 BOOL log_flag = FALSE;
-char log_path[_MAX_PATH] = "";
+char log_path[MAX_PATH] = "";
 
 // Print a text to the log file (if logging is on) and STDOUT (if verbose).
 // NOTE: the output log text is limitted at 500 characters.
@@ -506,7 +506,7 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 	do
 	{
 		// Found an entry which match the given file name.
-		if (_stricmp(file_name, process_entries.szExeFile) == 0)
+		if (strncmp(file_name, process_entries.szExeFile, MAX_PATH) == 0)
 		{
 			log_text("Found PID %d match %s."
 					, process_entries.th32ProcessID
@@ -553,8 +553,8 @@ DWORD get_pid_from_path(LPCSTR path, DWORD session_id)
 							{
 								module_path = strchr(s, ':') - 1;
 
-								if (_stricmp(path, module_path) == 0 ||
-									_stricmp(short_path, module_path) == 0)
+								if (strncmp(path, module_path, MAX_PATH) == 0 ||
+									strncmp(short_path, module_path, MAX_PATH) == 0)
 								{
 									pid = process_entries.th32ProcessID;
 								}
@@ -674,7 +674,7 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
 			{
 				log_text("%u has module %s", pid, full_path);
 
-				if (_stricmp(full_path, exe_path) == 0) 
+				if (strncmp(full_path, exe_path, MAX_PATH) == 0) 
 				{
 					found = TRUE; 
 					break;
@@ -693,11 +693,11 @@ BOOL has_module(DWORD pid, LPCSTR exe_path)
 // shutdown.exe /r /t 0
 void reboot_using_shutdown_cmd()
 {
-	char shutdown_cmd_path[_MAX_PATH];
+	char shutdown_cmd_path[MAX_PATH];
 
-	GetEnvironmentVariable("Windir", shutdown_cmd_path, _MAX_PATH);
+	GetEnvironmentVariable("Windir", shutdown_cmd_path, MAX_PATH);
 	strcat(shutdown_cmd_path, "\\system32\\shutdown.exe");
-	if (_spawnl(_P_NOWAIT, shutdown_cmd_path, shutdown_cmd_path, "/r", "/t", "0", NULL) == (intptr_t) NULL)
+	if (spawnl(_P_NOWAIT, shutdown_cmd_path, shutdown_cmd_path, "/r", "/t", "0", NULL) == (intptr_t) NULL)
 		log_text("(MAIN) Couldn't execute %s. Error code %d\n", shutdown_cmd_path, errno);
 	else
 		log_text("(MAIN) Executed %s.\n", shutdown_cmd_path);
