@@ -1,0 +1,19 @@
+Smartlaunch Fix (smlffix) 0.1
+Written by Phuong Vu, vuluuphuong@gmail.com
+
+This little utility run as a Windows service and do the followings:
+
+- Modify the Smartlaunch Client.inf file to set the correct ComputerNumber
+  and ComputerName using the current IP.
+- Monitor the Smartlaunch client process. If this process is terminated 
+  and does not come back within 10 seconds, the the system will reboot.
+
+The smlfix.ini in the %WINDIR%\system32 folder contains the path to the 
+Smartlaunch client folder. The default path is "C:\Program Files\
+Smartlaunch\Client" (DO NOT INCLUDE any the trailing slash). If it's not
+correct, then feel free to modify it and restart the "smlfix" service to
+update the value.
+
+During its service time, Smartlaunch Fix log all information into the 
+"%WINDIR%\system32\smlfix.log" file. You can view this file using any 
+text viewer.
